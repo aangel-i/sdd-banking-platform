@@ -12,11 +12,12 @@
 
 ### Session 2026-05-19
 
-- Q: Should the platform support Multi-Factor Authentication (MFA)? → A: MFA required for transfers exceeding $5000 threshold
+- Q: Should MFA be required for all transfers? → A: MFA required for transfers exceeding $5000 threshold
 - Q: How should encryption keys be managed? → A: Encrypted keys stored with user database (requires master key for decryption)
 - Q: How will performance be monitored and SLAs enforced? → A: Manual performance logs with periodic admin review; reactive troubleshooting
 - Q: What strategy prevents concurrent transaction race conditions? → A: Optimistic locking with version numbers for concurrent transaction handling
 - Q: Which data protection regulations apply? → A: GDPR + CCPA compliance required with US data residency
+- Q: What is the retention and accessibility scope for previous monthly statements? → A: On-demand generation; statements only exist when explicitly requested by customer; no persistent archive
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -76,18 +77,19 @@ Customers must be able to view all their past transactions in a detailed history
 
 ### User Story 4 - Monthly Spending Statements (Priority: P2)
 
-Customers must be able to generate and download monthly statements showing their account activity, opening/closing balances, and total deposits/withdrawals for each month.
+Customers must be able to generate and download monthly statements on-demand showing their account activity, opening/closing balances, and total deposits/withdrawals for any requested month. Statements are generated in real-time when requested and are not persistently archived.
 
 **Why this priority**: Statements provide formal records for reconciliation and tax/accounting purposes; valuable but secondary to core operations.
 
-**Independent Test**: Customer can generate a statement for any previous month showing accurate balances and transaction totals.
+**Independent Test**: Customer can request and generate a statement for any previous month showing accurate balances and transaction totals.
 
 **Acceptance Scenarios**:
 
-1. **Given** account with full month of transactions, **When** customer generates statement for that month, **Then** statement displays opening balance, closing balance, total deposits, and total withdrawals
-2. **Given** statement exists, **When** customer downloads statement, **Then** PDF or CSV file is generated with formatted data
-3. **Given** current month, **When** customer requests statement, **Then** system provides statement with transactions to current date
-4. **Given** month with no transactions, **When** customer generates statement, **Then** opening and closing balance are equal, deposit/withdrawal totals are zero
+1. **Given** account with full month of transactions, **When** customer requests to generate statement for that month, **Then** system calculates and displays opening balance, closing balance, total deposits, and total withdrawals in real-time
+2. **Given** statement generated on-demand, **When** customer downloads statement, **Then** PDF or CSV file is generated with formatted data from current request
+3. **Given** current incomplete month, **When** customer requests statement, **Then** system generates statement with transactions to current date and timestamp indicating generation time
+4. **Given** month with no transactions, **When** customer generates statement on-demand, **Then** opening and closing balance are equal, deposit/withdrawal totals are zero
+5. **Given** statement requested, **When** generation completes, **Then** customer receives statement; statement is not stored for future retrieval (on-demand generation)
 
 ---
 
@@ -138,7 +140,7 @@ Customers must be able to view spending insights including trends, patterns, and
 - **FR-012**: System MUST display transaction history for customer's account in paginated format
 - **FR-013**: System MUST allow customers to filter transaction history by date range
 - **FR-014**: System MUST calculate and display current account balance accurately at all times
-- **FR-015**: System MUST generate monthly spending statements showing opening balance, closing balance, total deposits, and total withdrawals
+- **FR-015**: System MUST generate monthly spending statements on-demand when customer requests; statements calculated in real-time from transaction history for requested month and not persistently archived
 - **FR-016**: System MUST allow download of statements in PDF or CSV format
 - **FR-017**: System MUST provide spending insights including total spending, average daily spend, and month-over-month comparison
 - **FR-018**: System MUST display spending insights via charts or visualizations for easy comprehension
@@ -165,7 +167,9 @@ Customers must be able to view spending insights including trends, patterns, and
 - Users can complete account registration in under 3 minutes with clear instructions
 - Users can successfully deposit, withdraw, and transfer funds in less than 2 minutes each
 - All transaction history is retrievable and accurate 100% of the time
-- Monthly statements generate and download within 5 seconds
+- Customers can successfully generate and download statements on-demand within 5 seconds for any historical month
+- Statement calculations are 100% accurate based on current transaction history
+- Customers can request statements for any month back to account creation without limits
 - Spending insights display within 3 seconds for any historical period
 - 99.9% of all transactions complete successfully without errors
 - Zero unauthorized access to customer accounts (100% authentication enforcement)
@@ -230,7 +234,10 @@ Customers must be able to view spending insights including trends, patterns, and
 - **Compliance**: PCI-DSS compliance required; passwords hashed, sensitive data encrypted, audit logging maintained
 - **Data protection**: GDPR and CCPA compliance required; customers have rights to access, delete, and port their data
 - **Data residency**: All customer data stored in US-based infrastructure; no data transferred outside US except as required for compliance
-- **Data retention**: Transaction data retained for 7 years per standard banking compliance; deletions honor GDPR right-to-erasure where applicable
+- **Statement generation model**: Statements are generated on-demand in real-time when customer requests them; no persistent statement storage or archive. Each request queries transaction history and calculates current balance state for the requested month.
+- **Statement availability**: Customers can request statements for any historical month back to account creation date; system generates statement dynamically for any requested period
+- **Statement retention**: Generated statements are not retained; each request generates fresh statement from transaction data. Customers can request same statement multiple times and receive current calculations
+- **Data consistency**: Statement accuracy depends on transaction history immutability; if transactions are modified (future compliance correction), previous statement requests will show different values if re-requested
 - **Session management**: Sessions use industry-standard token-based authentication (JWT or equivalent); authentication enforced on all operations
 - **ACID transactions**: All financial transactions must be atomic and immediately consistent across the system; optimistic locking with version numbers prevents concurrent conflicts
 - **Key management**: Encryption keys stored encrypted with user database; master key required for decryption

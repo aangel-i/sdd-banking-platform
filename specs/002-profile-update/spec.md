@@ -100,7 +100,7 @@ Customers must be able to view their complete profile information including emai
 ### Functional Requirements
 
 - **FR-001**: System MUST allow authenticated customers to initiate email change from profile page
-- **FR-002**: System MUST validate that new email address is not already registered to another account
+- **FR-002**: System MUST enforce email uniqueness at both registration and email change; reject any email already registered to another account
 - **FR-003**: System MUST require current password verification before allowing email change to proceed
 - **FR-004**: System MUST send verification email to new email address with clickable confirmation link valid for 24 hours
 - **FR-005**: System MUST confirm email change only after customer clicks verification link
@@ -183,7 +183,7 @@ Customers must be able to view their complete profile information including emai
 ## Assumptions
 
 - **Single account update**: Customers update profiles individually; no batch/admin updates of customer profiles
-- **Email uniqueness**: Email addresses are unique across all accounts; changing to email already in use rejected
+- **Email uniqueness**: Email addresses are unique globally across all accounts; no duplicate emails possible at any time. Uniqueness enforced at both account registration AND email change operations. All attempts to register or change to a duplicate email are rejected.
 - **Address format**: Addresses stored as separate fields (street, city, state, postal code, country), not free-form text
 - **Email verification**: 24-hour verification window standard; expired verifications require new request
 - **Password constraints**: Same password strength rules as registration (8+ chars, mixed case, number, symbol); no history of previous passwords enforced
@@ -193,3 +193,9 @@ Customers must be able to view their complete profile information including emai
 - **Compliance alignment**: Profile updates comply with GDPR (data accuracy, customer control) and CCPA (customer access to profile data)
 - **Security**: All profile changes require re-authentication (current password or MFA if applicable); sensitive operations encrypted end-to-end
 - **No blind changes**: Customers see current values before changing; cannot change profile of another account
+
+## Clarifications
+
+### Session 2026-05-19
+
+- Q: When should the system enforce email uniqueness? → A: Email uniqueness enforced at BOTH registration and email change (comprehensive, no duplicates possible at any time)
