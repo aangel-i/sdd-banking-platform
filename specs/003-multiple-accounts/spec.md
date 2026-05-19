@@ -8,7 +8,7 @@
 
 **Input**: The customer is able to open up an account (either checking or savings). The customer is able to have more than 1 account and it can be of either type
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Create New Checking Account (Priority: P1) 🎯
 
@@ -115,7 +115,7 @@ Customers must be able to transfer funds between their own checking and savings 
 - What if savings account has withdrawal restrictions or minimum balance?
   - **Answer**: Display restrictions clearly; validate at withdrawal/transfer time; reject if violates constraints
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -142,6 +142,33 @@ Customers must be able to transfer funds between their own checking and savings 
 - **FR-021**: System MUST prevent operation on closed or inactive accounts (if applicable)
 - **FR-022**: System MUST audit log account creation, closure, and transfers for compliance
 
+- **FR-023**: System MUST provide an authenticated API/UI endpoint to retrieve a single account's details by `account_id`.
+- **FR-024**: The account detail response MUST include, at minimum, the following fields:
+  - `id` (UUID)
+  - `account_number` (human-readable)
+  - `account_type` (CHECKING or SAVINGS)
+  - `currency_code` (ISO-4217)
+  - `balance` (current ledger balance in cents)
+  - `available_balance` (balance available for withdrawal after holds in cents)
+  - `opening_balance` (in cents)
+  - `status` (Active/Inactive/Closed)
+  - `interest_rate` (nullable, percent)
+  - `created_date` (UTC timestamp)
+  - `last_transaction_date` (UTC timestamp, nullable)
+  - `closed_date` (UTC timestamp, nullable)
+  - `pending_transfers_count` (integer)
+  - `unresolved_holds_count` (integer)
+  - `transactions_url` (link or href to fetch paginated transactions for this account)
+  - `owner_customer_id` (UUID) — returned only when the caller is authorized to view this field (i.e., the account owner or authorized admin)
+  - `display_name` (optional customer-provided label)
+  - NOTE: Sensitive fields MUST NOT be returned (e.g., `password_hash`, full unredacted internal tokens).
+
+- **FR-025**: If the requested `account_id` does not exist, the system MUST return a 404 Not Found (error code: ACCOUNT_NOT_FOUND) to the caller.
+- **FR-026**: If the requested account exists but does not belong to the authenticated customer, the system MUST return a 403 Forbidden (error code: FORBIDDEN) and must not disclose whether the account exists beyond the standard error.
+- **FR-027**: Closed account behaviour: The detail endpoint MUST return account details for CLOSED accounts (status = CLOSED) for read-only and historical purposes. The response MUST include `closed_date` and the final `balance` at time of closure. Any write/transaction attempts against closed accounts are prevented by other APIs and should return 409 Conflict (see FR-021 for prevention of operations on closed accounts).
+- **FR-028**: The account detail response MUST include indicators useful for blocking/resolution flows (e.g., `pending_transfers_count`, `unresolved_holds_count`, `available_balance`) so the UI can present actionable guidance (for example, blocking deletion when balances/pending items exist).
+- **FR-029**: The account detail endpoint MUST support conditional requests (ETag/Last-Modified) and return appropriate cache headers to allow safe short-lived caching of static fields while ensuring balances/holds are fresh.
+
 ### Non-Functional Requirements
 
 - **NFR-001**: Account creation MUST complete within 2 seconds
@@ -153,7 +180,10 @@ Customers must be able to transfer funds between their own checking and savings 
 - **NFR-007**: Account data MUST be encrypted at rest and in transit
 - **NFR-008**: Account ownership validation MUST occur on every request to prevent unauthorized access
 
-## Success Criteria *(mandatory)*
+- **NFR-009**: Account detail retrieval MUST return within 500ms for 95% of requests and within 2 seconds for 99.9% of requests under typical production load (defined as customers with up to 50 accounts and normal transaction throughput).
+- **NFR-010**: Account detail endpoint MUST support conditional GETs (ETag/Last-Modified) and include appropriate Cache-Control headers for short-lived caching of non-volatile fields. Dynamic financial fields (e.g., `balance`, `available_balance`) MUST either be marked as non-cacheable or updated frequently with short TTLs.
+
+## Success Criteria _(mandatory)_
 
 - Customers can create new accounts in under 1 minute with clear account type selection
 - Account switching is seamless with dashboard updating within 1 second
