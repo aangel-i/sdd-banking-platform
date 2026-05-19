@@ -18,24 +18,27 @@
 - Q: What strategy prevents concurrent transaction race conditions? → A: Optimistic locking with version numbers for concurrent transaction handling
 - Q: Which data protection regulations apply? → A: GDPR + CCPA compliance required with US data residency
 - Q: What is the retention and accessibility scope for previous monthly statements? → A: On-demand generation; statements only exist when explicitly requested by customer; no persistent archive
+- Q: Should registration automatically log in the customer and redirect to dashboard, or require separate login? → A: Auto-login on registration with immediate dashboard redirect (seamless UX, no confirmation email required)
+- Q: What should be the API token requirement and expiration behavior? → A: All API requests require Authorization header with valid token. Expired tokens return HTTP 401; frontend intercepts and redirects to login page
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Account Registration and Login (Priority: P1) 🎯
 
-Customers must be able to create new accounts and authenticate to access the platform. This is the foundational capability that enables all other features.
+Customers must be able to create new accounts and authenticate to access the platform. Upon successful registration, customers are automatically logged in and redirected directly to the dashboard. This is the foundational capability that enables all other features.
 
-**Why this priority**: Account management is the critical entry point; no other feature can function without it.
+**Why this priority**: Account management is the critical entry point; no other feature can function without it. Seamless registration-to-dashboard flow reduces friction for new users.
 
-**Independent Test**: A new customer can register, logout, and login successfully without any other platform features working.
+**Independent Test**: A new customer can register, and without any additional login steps, be automatically logged into their dashboard and view account information.
 
 **Acceptance Scenarios**:
 
-1. **Given** no existing account, **When** customer registers with valid email and password, **Then** account is created and customer receives confirmation message
-2. **Given** valid credentials, **When** customer logs in, **Then** customer can access their dashboard
-3. **Given** wrong email, **When** customer attempts login, **Then** system rejects with "Invalid credentials" message
-4. **Given** registered account, **When** customer logs out, **Then** session is terminated and customer is redirected to login page
-5. **Given** existing account, **When** customer attempts to register with same email, **Then** system prevents duplicate and displays "Email already registered"
+1. **Given** no existing account, **When** customer registers with valid email and password, **Then** account is created and customer is automatically logged in, redirected to dashboard
+2. **Given** registration successful with auto-login, **When** customer accesses dashboard, **Then** customer can immediately view account information and perform transactions without additional authentication
+3. **Given** valid credentials on login page, **When** returning customer logs in, **Then** customer can access their dashboard
+4. **Given** wrong email, **When** customer attempts login, **Then** system rejects with "Invalid credentials" message
+5. **Given** logged-in customer, **When** customer logs out, **Then** session is terminated and customer is redirected to login page
+6. **Given** existing account, **When** customer attempts to register with same email, **Then** system prevents duplicate and displays "Email already registered"
 
 ---
 
@@ -128,8 +131,9 @@ Customers must be able to view spending insights including trends, patterns, and
 - **FR-001**: System MUST allow customers to register new accounts with email, password, and account holder name
 - **FR-002**: System MUST validate email format and enforce minimum password strength (8+ characters, mixed case, number, symbol)
 - **FR-003**: System MUST securely store passwords using industry-standard hashing (bcrypt, scrypt, or argon2); encryption keys stored encrypted with user database
-- **FR-004**: System MUST authenticate customers via email and password for login
-- **FR-004a**: System MUST require Multi-Factor Authentication (TOTP or SMS) for all transfers exceeding $5000 threshold; MFA optional for other operations
+- **FR-004**: System MUST automatically log in customers immediately upon successful registration and redirect to dashboard without requiring additional login
+- **FR-004a**: System MUST authenticate returning customers via email and password for login
+- **FR-004b**: System MUST require Multi-Factor Authentication (TOTP or SMS) for all transfers exceeding $5000 threshold; MFA optional for other operations
 - **FR-005**: System MUST maintain customer sessions and automatically logout after 30 minutes of inactivity
 - **FR-006**: System MUST allow authenticated customers to deposit funds to their account
 - **FR-007**: System MUST allow authenticated customers to withdraw funds from their account
@@ -148,6 +152,9 @@ Customers must be able to view spending insights including trends, patterns, and
 - **FR-020**: System MUST ensure all transactions are atomic—either fully complete or fully revert, with no partial states; optimistic locking with version numbers prevents concurrent transaction race conditions
 - **FR-021**: System MUST maintain data consistency and integrity across all operations
 - **FR-022**: System MUST enforce row-level security so customers can only access their own account data
+- **FR-023**: System MUST require valid authentication token (Bearer token in Authorization header) for all API requests
+- **FR-024**: System MUST return HTTP 401 Unauthorized when API request includes expired or invalid token
+- **FR-025**: System MUST provide clear error message with HTTP 401 response indicating token expiration; frontend detects 401 and redirects user to login page
 
 ### Non-Functional Requirements
 
@@ -161,6 +168,7 @@ Customers must be able to view spending insights including trends, patterns, and
 - **NFR-008**: System MUST encrypt sensitive data in transit (HTTPS) and at rest using encrypted keys stored with user database
 - **NFR-009**: System MUST maintain manual performance logs and enable periodic admin review for reactive troubleshooting of SLA breaches
 - **NFR-010**: System MUST comply with GDPR and CCPA data protection regulations; implement customer data access/deletion/portability rights; maintain US data residency
+- **NFR-011**: System MUST use secure token-based API authentication (Bearer token scheme in Authorization header) for all API endpoints; expired tokens result in HTTP 401 response
 
 ## Success Criteria *(mandatory)*
 
@@ -172,7 +180,9 @@ Customers must be able to view spending insights including trends, patterns, and
 - Customers can request statements for any month back to account creation without limits
 - Spending insights display within 3 seconds for any historical period
 - 99.9% of all transactions complete successfully without errors
-- Zero unauthorized access to customer accounts (100% authentication enforcement)
+- Zero unauthorized access to customer accounts (100% authentication enforcement); all API requests require valid token
+- 100% of expired token requests return HTTP 401; frontend successfully redirects to login page
+- API endpoints reject requests with missing or invalid Authorization header
 - Dashboard responsive and usable on devices 320px to 2560px wide
 - All customers report UI as intuitive in user testing (target: 90% positive feedback)
 - System handles peak load of 10,000 concurrent users without degradation
@@ -227,7 +237,8 @@ Customers must be able to view spending insights including trends, patterns, and
 
 ## Assumptions
 
-- **Single user per account**: Each account represents one customer; no joint accounts or multi-user access
+- **Registration-to-login flow**: Upon successful account registration, customer is automatically authenticated and a valid session is created. Customer is immediately redirected to dashboard without requiring manual login. This eliminates friction and provides seamless onboarding.
+- **No confirmation email requirement**: Registration does not require email verification step before dashboard access. Account becomes active immediately upon registration completion.
 - **Account security**: Only account holder can access their account data; authentication is enforced for all operations
 - **Transfer model**: Transfers occur between existing customer accounts by email lookup; fails if recipient doesn't exist
 - **Currency**: Single currency per platform deployment; amounts stored as integers in cents to avoid floating-point errors
@@ -238,6 +249,9 @@ Customers must be able to view spending insights including trends, patterns, and
 - **Statement availability**: Customers can request statements for any historical month back to account creation date; system generates statement dynamically for any requested period
 - **Statement retention**: Generated statements are not retained; each request generates fresh statement from transaction data. Customers can request same statement multiple times and receive current calculations
 - **Data consistency**: Statement accuracy depends on transaction history immutability; if transactions are modified (future compliance correction), previous statement requests will show different values if re-requested
+- **API authentication scheme**: All API requests require valid bearer token in `Authorization: Bearer <token>` header. System enforces token validation on every endpoint. Tokens expire per session management policy (30 minutes inactivity).
+- **Expired token handling**: When API receives expired or invalid token, system returns HTTP 401 Unauthorized with error message indicating token expiration. Frontend JavaScript detects 401 response and performs client-side redirect to login page. No server-side redirect used; client handles all UI state transitions.
+- **Token validation point**: Tokens validated at API gateway/middleware layer before business logic execution. Failed validation immediately returns 401 without processing request.
 - **Session management**: Sessions use industry-standard token-based authentication (JWT or equivalent); authentication enforced on all operations
 - **ACID transactions**: All financial transactions must be atomic and immediately consistent across the system; optimistic locking with version numbers prevents concurrent conflicts
 - **Key management**: Encryption keys stored encrypted with user database; master key required for decryption
